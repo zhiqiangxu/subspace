@@ -48,8 +48,10 @@ use sp_objects::ObjectsApi;
 use sp_runtime::traits::Block as BlockT;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::fs;
 use std::marker::PhantomData;
 use std::num::NonZeroUsize;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 use std::time::Duration;
@@ -125,6 +127,15 @@ pub trait SubspaceRpcApi {
 
     #[method(name = "subspace_piece", blocking)]
     fn piece(&self, piece_index: PieceIndex) -> RpcResult<Option<Vec<u8>>>;
+
+    #[method(name = "subspace_fetch_piece")]
+    async fn fetch_piece(&self, piece_index: PieceIndex) -> RpcResult<Option<Vec<u8>>>;
+
+    #[method(name = "subspace_save_piece")]
+    async fn save_piece(&self, piece_index: PieceIndex, piece: Vec<u8>) -> RpcResult<()>;
+
+    #[method(name = "subspace_piece_exists")]
+    fn piece_exists(&self, piece_index: PieceIndex) -> RpcResult<bool>;
 
     #[method(name = "subspace_acknowledgeArchivedSegmentHeader")]
     async fn acknowledge_archived_segment_header(
@@ -775,6 +786,25 @@ where
         }
 
         Ok(None)
+    }
+
+    async fn fetch_piece(&self, piece_index: PieceIndex) -> RpcResult<Option<Vec<u8>>> {
+        if !self.piece_exists(piece_index).unwrap() {
+            return Ok(None);
+        }
+        let file_contents: Vec<u8> = fs::read(format!("/mnt/subspace-piece/{:?}", piece_index))?;
+        Ok(Some(file_contents))
+    }
+
+    async fn save_piece(&self, piece_index: PieceIndex, piece: Vec<u8>) -> RpcResult<()> {
+        fs::write(format!("/mnt/subspace-piece/{:?}", piece_index), piece)?;
+        Ok(())
+    }
+
+    fn piece_exists(&self, piece_index: PieceIndex) -> RpcResult<bool> {
+        let path = PathBuf::from(format!("/mnt/subspace-piece/{:?}", piece_index));
+        let file_path: &Path = path.as_ref();
+        Ok(file_path.exists())
     }
 
     async fn segment_headers(

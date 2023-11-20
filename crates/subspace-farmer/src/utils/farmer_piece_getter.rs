@@ -48,6 +48,34 @@ impl<PV, NC> FarmerPieceGetter<PV, NC> {
     }
 }
 
+impl<PV, NC> FarmerPieceGetter<PV, NC>
+where
+    PV: PieceValidator + Send + 'static,
+    NC: NodeClient,
+{
+    async fn persist_on_node(&self, piece_index: PieceIndex, piece: &Piece) {
+        match self.node_client.piece_exists(piece_index).await {
+            Ok(true) => return,
+            Ok(false) => {
+                match self
+                    .node_client
+                    .save_piece(piece_index, piece.as_ref().to_vec())
+                    .await
+                {
+                    Ok(_) => return,
+                    Err(err) => {
+                        error!("Failed to call save_piece from node: {err}, piece_index: {piece_index}");
+                    }
+                }
+            }
+            Err(err) => {
+                error!("Failed to call piece_exists from node: {err}, piece_index: {piece_index}");
+                return;
+            }
+        }
+    }
+}
+
 #[async_trait]
 impl<PV, NC> PieceGetter for FarmerPieceGetter<PV, NC>
 where
@@ -64,7 +92,25 @@ where
         trace!(%piece_index, "Getting piece from local cache");
         if let Some(piece) = self.piece_cache.get_piece(key).await {
             trace!(%piece_index, "Got piece from local cache successfully");
+            self.persist_on_node(piece_index, &piece).await;
             return Ok(Some(piece));
+        }
+
+        match self.node_client.fetch_piece(piece_index).await {
+            Ok(Some(piece)) => {
+                trace!(%piece_index, "Got piece from node successfully");
+                return Ok(Some(piece));
+            }
+            Ok(None) => {
+                // Nothing to do
+            }
+            Err(error) => {
+                error!(
+                    %error,
+                    %piece_index,
+                    "Failed to retrieve piece from node"
+                );
+            }
         }
 
         // L2 piece acquisition
@@ -76,6 +122,10 @@ where
 
         if maybe_piece.is_some() {
             trace!(%piece_index, "Got piece from DSN L2 cache successfully");
+            if let Some(piece) = maybe_piece.as_ref() {
+                self.persist_on_node(piece_index, piece).await;
+            }
+
             return Ok(maybe_piece);
         }
 
@@ -84,6 +134,7 @@ where
         match self.node_client.piece(piece_index).await {
             Ok(Some(piece)) => {
                 trace!(%piece_index, "Got piece from node successfully");
+                self.persist_on_node(piece_index, &piece).await;
                 return Ok(Some(piece));
             }
             Ok(None) => {
@@ -130,7 +181,9 @@ where
 
             if maybe_piece.is_some() {
                 trace!(%piece_index, %peer_id, "DSN L1 lookup succeeded");
-
+                if let Some(piece) = maybe_piece.as_ref() {
+                    self.persist_on_node(piece_index, piece).await;
+                }
                 return Ok(maybe_piece);
             }
         }

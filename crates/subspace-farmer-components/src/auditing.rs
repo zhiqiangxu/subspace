@@ -2,12 +2,13 @@ use crate::proving::SolutionCandidates;
 use crate::sector::{sector_size, SectorContentsMap, SectorMetadataChecksummed};
 use crate::{ReadAtOffset, ReadAtSync};
 use rayon::prelude::*;
+use std::time::Instant;
 use subspace_core_primitives::crypto::Scalar;
 use subspace_core_primitives::{
     Blake3Hash, PublicKey, SBucket, SectorId, SectorIndex, SectorSlotChallenge, SolutionRange,
 };
 use subspace_verification::is_within_solution_range;
-use tracing::warn;
+use tracing::{info, warn};
 
 /// Result of sector audit
 #[derive(Debug, Clone)]
@@ -102,8 +103,9 @@ where
 {
     let public_key_hash = public_key.hash();
 
+    let start = Instant::now();
     // Create auditing info for all sectors in parallel
-    sectors_metadata
+    let result = sectors_metadata
         .par_iter()
         .map(|sector_metadata| {
             (
@@ -124,6 +126,10 @@ where
                 return None;
             }
 
+            info!(
+                "s_bucket_audit_size:{}",
+                sector_auditing_info.s_bucket_audit_size
+            );
             let sector = plot.offset(
                 usize::from(sector_metadata.sector_index)
                     * sector_size(sector_metadata.pieces_in_sector),
@@ -165,7 +171,13 @@ where
                 best_solution_distance,
             })
         })
-        .collect()
+        .collect();
+    info!(
+        "audit time:{:?} #sector:{}",
+        start.elapsed(),
+        sectors_metadata.len()
+    );
+    result
 }
 
 struct SectorAuditingDetails {

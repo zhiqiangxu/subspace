@@ -28,14 +28,14 @@ use subspace_proof_of_space::{Table, TableGenerator};
 use thiserror::Error;
 use tokio::sync::{AcquireError, OwnedSemaphorePermit, Semaphore};
 use tokio::task::yield_now;
-use tracing::{debug, trace, warn};
+use tracing::{debug, info, trace, warn};
 
 const RECONSTRUCTION_CONCURRENCY_LIMIT: usize = 1;
 
 fn default_backoff() -> ExponentialBackoff {
     ExponentialBackoff {
         initial_interval: Duration::from_secs(15),
-        max_interval: Duration::from_secs(10 * 60),
+        max_interval: Duration::from_secs(60),
         // Try until we get a valid piece
         max_elapsed_time: None,
         ..ExponentialBackoff::default()
@@ -650,6 +650,10 @@ async fn download_sector_internal<PG: PieceGetter>(
                 return Ok(());
             };
 
+            info!(
+                "before fetching piece {}, policy {:?}",
+                piece_index, piece_getter_retry_policy
+            );
             let mut piece_result = piece_getter
                 .get_piece(piece_index, piece_getter_retry_policy)
                 .await;
@@ -658,6 +662,11 @@ async fn download_sector_internal<PG: PieceGetter>(
                 .as_ref()
                 .map(|piece| piece.is_some())
                 .unwrap_or_default();
+
+            info!(
+                "after fetching piece {}, succeeded: {}",
+                piece_index, succeeded
+            );
 
             // All retries failed
             if !succeeded {

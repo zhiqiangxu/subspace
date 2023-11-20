@@ -669,6 +669,7 @@ where
             .iter()
             .map(|sector_metadata| (sector_metadata.sector_index, sector_metadata.history_size))
             .collect_into(&mut sectors_to_check);
+        let total_sectors = sectors_to_check.len();
         for (sector_index, history_size) in sectors_to_check.drain(..) {
             if let Some(expires_at) = sectors_expire_at.get(&sector_index).copied() {
                 trace!(
@@ -780,6 +781,11 @@ where
             }
         }
 
+        info!(
+            "sectors to replot: {} active sectors: {}",
+            sectors_to_replot.len(),
+            total_sectors - sectors_to_replot.len()
+        );
         let sectors_queued = sectors_to_replot.len();
         sectors_to_replot.sort_by_key(|sector_to_replot| sector_to_replot.expires_at);
         let mut sector_indices_to_replot = sectors_to_replot.drain(..).enumerate().peekable();

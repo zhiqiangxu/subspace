@@ -176,6 +176,40 @@ impl NodeClient for NodeRpcClient {
         Ok(None)
     }
 
+    async fn fetch_piece(&self, piece_index: PieceIndex) -> Result<Option<Piece>, Error> {
+        let result: Option<Vec<u8>> = self
+            .client
+            .request("subspace_fetch_piece", rpc_params![&piece_index])
+            .await?;
+
+        if let Some(bytes) = result {
+            let piece = Piece::try_from(bytes.as_slice()).map_err(|_| {
+                format!(
+                    "fetch_piece Cannot convert piece. PieceIndex={}",
+                    piece_index
+                )
+            })?;
+
+            return Ok(Some(piece));
+        }
+
+        Ok(None)
+    }
+
+    async fn save_piece(&self, piece_index: PieceIndex, piece: Vec<u8>) -> Result<(), Error> {
+        Ok(self
+            .client
+            .request("subspace_save_piece", rpc_params![piece_index, piece])
+            .await?)
+    }
+
+    async fn piece_exists(&self, piece_index: PieceIndex) -> Result<bool, Error> {
+        Ok(self
+            .client
+            .request("subspace_piece_exists", rpc_params![piece_index])
+            .await?)
+    }
+
     async fn acknowledge_archived_segment_header(
         &self,
         segment_index: SegmentIndex,
