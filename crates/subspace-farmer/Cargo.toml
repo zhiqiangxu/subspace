@@ -57,3 +57,4 @@ tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 ulid = { version = "1.0.0", features = ["serde"] }
 zeroize = "1.6.0"
+iouring = { git = "https://github.com/zhiqiangxu/iouring", rev="8788ad53d6eadd9602ac20aea18f5a3928e62b33" }

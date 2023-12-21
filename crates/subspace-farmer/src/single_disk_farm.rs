@@ -6,7 +6,7 @@ mod plotting;
 use crate::identity::{Identity, IdentityError};
 use crate::node_client::NodeClient;
 use crate::reward_signing::reward_signing;
-use crate::single_disk_farm::farming::rayon_files::RayonFiles;
+use crate::single_disk_farm::farming::iouring_file::IoUringFile;
 pub use crate::single_disk_farm::farming::FarmingError;
 use crate::single_disk_farm::farming::{
     farming, slot_notification_forwarder, FarmingOptions, PlotAudit,
@@ -1078,7 +1078,8 @@ impl SingleDiskFarm {
                             }
                         }
 
-                        let plot = RayonFiles::open(&directory.join(Self::PLOT_FILE))?;
+                        // let plot = RayonFiles::open(&directory.join(Self::PLOT_FILE))?;
+                        let plot = IoUringFile::open(&directory.join(Self::PLOT_FILE))?;
                         let plot_audit = PlotAudit::new(&plot);
 
                         let farming_options = FarmingOptions {

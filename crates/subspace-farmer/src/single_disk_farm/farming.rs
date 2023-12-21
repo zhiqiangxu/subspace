@@ -1,3 +1,4 @@
+pub mod iouring_file;
 pub mod rayon_files;
 
 use crate::node_client;
