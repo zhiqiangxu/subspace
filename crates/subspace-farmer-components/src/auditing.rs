@@ -137,6 +137,7 @@ where
 
             let mut s_bucket = vec![0; sector_auditing_info.s_bucket_audit_size];
 
+            let s1 = Instant::now();
             if let Err(error) = sector.read_at(
                 &mut s_bucket,
                 sector_auditing_info.s_bucket_audit_offset_in_sector,
@@ -150,6 +151,7 @@ where
 
                 return None;
             }
+            info!("read_at time:{:?}", s1.elapsed());
 
             let (winning_chunks, best_solution_distance) = map_winning_chunks(
                 &s_bucket,
